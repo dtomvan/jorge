@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -25,6 +27,30 @@ import (
 const FM_SEPARATOR = "---"
 const NO_SYNTAX_HIGHLIGHTING = ""
 const CODE_TABWIDTH = 4
+
+// orgLinkWriter wraps HTMLWriter to resolve relative org links to absolute URLs,
+// so they work regardless of whether the page URL has a trailing slash.
+//
+// For example, given page url /blog/my-post, the org link [[other-post][link text]]
+// renders as <a href="/blog/other-post">link text</a> whether the browser
+// navigates to /blog/my-post or /blog/my-post/.
+type orgLinkWriter struct {
+	*org.HTMLWriter
+	pageURL string
+}
+
+func (w *orgLinkWriter) WriteRegularLink(l org.RegularLink) {
+	isRelative := l.Protocol == "" || l.Protocol == "file"
+	if w.pageURL != "" && isRelative && !strings.HasPrefix(l.URL, "/") {
+		base, _ := url.Parse(path.Dir(w.pageURL) + "/")
+		rawURL := strings.TrimPrefix(l.URL, "file:")
+		if rel, err := url.Parse(rawURL); err == nil {
+			l.URL = base.ResolveReference(rel).String()
+			l.Protocol = ""
+		}
+	}
+	w.HTMLWriter.WriteRegularLink(l)
+}
 
 type Engine = liquid.Engine
 
@@ -158,8 +184,9 @@ func (templ Template) RenderWith(context map[string]interface{}, hlTheme string)
 
 		// make * -> h1, ** -> h2, etc
 		htmlWriter.TopLevelHLevel = 1
-		// handle relative paths in links
-		htmlWriter.PrettyRelativeLinks = true
+		page, _ := context["page"].(map[string]interface{})
+		pageURL, _ := page["url"].(string)
+		htmlWriter.ExtendingWriter = &orgLinkWriter{HTMLWriter: htmlWriter, pageURL: pageURL}
 		if hlTheme != NO_SYNTAX_HIGHLIGHTING {
 			htmlWriter.HighlightCodeBlock = highlightCodeBlock(hlTheme)
 		}

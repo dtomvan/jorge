@@ -178,6 +178,30 @@ tags: ["software", "web"]
 	assertEqual(t, string(content), expected)
 }
 
+func TestRenderOrgInternalLinks(t *testing.T) {
+	input := `---
+title: my new post
+---
+#+OPTIONS: toc:nil num:nil
+[[other-post][link text]]
+`
+
+	file := newFile("test*.org", input)
+	defer os.Remove(file.Name())
+
+	templ, err := Parse(NewEngine("https://olano.dev", "includes"), file.Name())
+	assertEqual(t, err, nil)
+
+	context := map[string]interface{}{
+		"page": map[string]interface{}{
+			"url": "/blog/my-post",
+		},
+	}
+	content, err := templ.RenderWith(context, NO_SYNTAX_HIGHLIGHTING)
+	assertEqual(t, err, nil)
+	assert(t, strings.Contains(string(content), `href="/blog/other-post"`))
+}
+
 // ------ HELPERS --------
 
 func newFile(path string, contents string) *os.File {
