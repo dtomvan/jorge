@@ -208,7 +208,7 @@ func (templ Template) RenderWith(context map[string]interface{}, hlTheme string)
 				extension.Footnote,
 				gm_highlight.NewHighlighting(
 					gm_highlight.WithStyle(hlTheme),
-					gm_highlight.WithFormatOptions(html.TabWidth(CODE_TABWIDTH)),
+					gm_highlight.WithFormatOptions(htmlOptions(hlTheme)...),
 				)))
 		}
 		md := goldmark.New(options...)
@@ -231,9 +231,7 @@ func highlightCodeBlock(hlTheme string) func(source string, lang string, inline 
 		}
 		l = chroma.Coalesce(l)
 		it, _ := l.Tokenise(nil, source)
-		options := []html.Option{
-			html.TabWidth(CODE_TABWIDTH),
-		}
+		options := htmlOptions(hlTheme)
 		if params[":hl_lines"] != "" {
 			ranges := org.ParseRanges(params[":hl_lines"])
 			if ranges != nil {
@@ -246,4 +244,14 @@ func highlightCodeBlock(hlTheme string) func(source string, lang string, inline 
 		}
 		return `<div class="highlight">` + "\n" + w.String() + "\n" + `</div>`
 	}
+}
+
+func htmlOptions(hlTheme string) []html.Option {
+	htmlOptions := []html.Option{
+		html.TabWidth(CODE_TABWIDTH),
+	}
+	if hlTheme == "custom" {
+		htmlOptions = append(htmlOptions, html.WithClasses(true))
+	}
+	return htmlOptions
 }
