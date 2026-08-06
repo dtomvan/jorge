@@ -10,6 +10,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/facundoolano/jorge/config"
+	"github.com/facundoolano/jorge/markup"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -63,12 +64,30 @@ func (cmd *Post) Run(ctx *kong.Context) error {
 		path = filepath.Join(filename)
 	}
 
-	// initialize the post front matter
-	content := fmt.Sprintf(DEFAULT_FRONTMATTER, title, now.Format(time.RFC3339), config.Lang)
+	var content string
 
-	// org files need some extra boilerplate
-	if filepath.Ext(path) == ".org" {
-		content += fmt.Sprintf(DEFAULT_ORG_DIRECTIVES, config.Lang)
+	templatePath := fmt.Sprintf("template%s", filepath.Ext(path))
+
+	if liquidContent, err := os.ReadFile(templatePath); err == nil {
+		engine := markup.NewEngine(config.SiteUrl, config.IncludesDir)
+		liquid, err := engine.ParseTemplateAndCache(liquidContent, templatePath, 0)
+		if err != nil {
+			return err
+		}
+		content_bytes, err := liquid.Render(map[string]any{
+			"title": title,
+			"date": now.Format(time.RFC3339),
+			"config": config.AsContext(),
+		})
+		content = string(content_bytes)
+	} else {
+		// initialize the post front matter
+		content = fmt.Sprintf(DEFAULT_FRONTMATTER, title, now.Format(time.RFC3339), config.Lang)
+
+		// org files need some extra boilerplate
+		if filepath.Ext(path) == ".org" {
+			content += fmt.Sprintf(DEFAULT_ORG_DIRECTIVES, config.Lang)
+		}
 	}
 
 	if err := os.WriteFile(path, []byte(content), FILE_RW_MODE); err != nil {

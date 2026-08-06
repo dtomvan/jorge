@@ -131,6 +131,7 @@ func LoadDev(rootDir string, host string, port int, reload bool) (*Config, error
 func (config Config) AsContext() map[string]interface{} {
 	context := map[string]interface{}{
 		"url": config.SiteUrl,
+		"lang": config.Lang,
 	}
 	maps.Copy(context, config.overrides)
 	return context
